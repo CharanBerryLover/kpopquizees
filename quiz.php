@@ -41,12 +41,19 @@ session_start();
 
         <form action="checkAnswer.php" method="post">
             <?php
-            for ($i = 1; $i <= totalquestion($conn); $i++) :
-                $questionSql = "SELECT * FROM questions WHERE id = $i";
-                $questionResult = mysqli_query($conn, $questionSql);
-                $row = mysqli_fetch_assoc($questionResult);
+            $selectedCategory = $_SESSION['selected_category'];
 
+            // Use prepared statement to prevent SQL injection
+            $questionSql = "SELECT * FROM questions WHERE cat = ?";
+
+            $questionStmt = mysqli_prepare($conn, $questionSql);
+            mysqli_stmt_bind_param($questionStmt, "s", $selectedCategory);
+            mysqli_stmt_execute($questionStmt);
+            $questionResult = mysqli_stmt_get_result($questionStmt);
+
+            while ($row = mysqli_fetch_assoc($questionResult)) {
                 $imageData = $row['q_images'];
+                $questionId = $row['id'];  // Get the id of the current question
             ?>
 
                 <div class="container">
@@ -59,28 +66,39 @@ session_start();
                                     <?php
                                     // Display the image if image data is available
                                     if ($imageData) {
-                                       echo '<img src="' . $row["q_images"] . '" alt="" style="max-width: 300px; height: auto;">';
+                                        echo '<img src="' . $row["q_images"] . '" alt="" style="max-width: 300px; height: auto;">';
                                     }
                                     ?>
 
-
                                     <?php
-                                    $answerSql = "SELECT * FROM answers WHERE ans_id = $i";
-                                    $answerResult = mysqli_query($conn, $answerSql);
-                                    while ($row = mysqli_fetch_assoc($answerResult)) :
+                                    // Use prepared statement to fetch options based on category and question id
+                                    $optionsSql = "SELECT * FROM answers WHERE cat = ? AND id = ?";
+                                    $optionsStmt = mysqli_prepare($conn, $optionsSql);
+                                    mysqli_stmt_bind_param($optionsStmt, "ss", $selectedCategory, $questionId);
+                                    mysqli_stmt_execute($optionsStmt);
+                                    $optionsResult = mysqli_stmt_get_result($optionsStmt);
+
+                                    // Check if there are options for the given category and question id
+                                    if (mysqli_num_rows($optionsResult) > 0) {
+                                        while ($optionsRow = mysqli_fetch_assoc($optionsResult)) {
                                     ?>
-                                        <div class="form-check">
-                                            <input type="radio" class="form-check-input" name="checkanswer[<?php echo $row['ans_id']; ?>]" value="<?php echo $row['bil']; ?>">
-                                            <?php echo $row['answer']; ?>
-                                        </div>
-                                    <?php endwhile ?>
+                                            <div class="form-check">
+                                                <input type="radio" class="form-check-input" name="checkanswer[<?php echo $optionsRow['id']; ?>]" value="<?php echo $optionsRow['bil']; ?>">
+                                                <?php echo $optionsRow['answer']; ?>
+                                            </div>
+                                    <?php
+                                        }
+                                    } else {
+                                        echo "<p>No options available for this question.</p>";
+                                    }
+                                    ?>
 
                                 </div>
                             </div>
                         </div>
                     </div>
                 </div>
-            <?php endfor ?>
+            <?php } ?>
 
             <div class="col-md-8 mb-5">
                 <button type="submit" class="btn btn-success" name="answer-submit">Submit Answers</button>
