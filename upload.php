@@ -4,7 +4,7 @@ include("connect.php");
 if (isset($_POST["submit"])) {
     $id = $_POST["questionid"];
     $question = $_POST["question"];
-    $ans_id = $_POST["answerid"];
+    $answer = $_POST["answer"];
     $cat = $_POST["category"];
 
     // For uploads photos
@@ -34,14 +34,19 @@ if (isset($_POST["submit"])) {
         if ($question !== "") {
             move_uploaded_file($_FILES["imageUpload"]["tmp_name"], $upload_file);
 
-            $sql = "INSERT INTO questions (id, q_images, question, ans_id, cat) 
-                    VALUES ('$id', '$q_images', '$question', '$ans_id', '$cat')";
+            // Use prepared statement to prevent SQL injection
+            $sql = "INSERT INTO questions (id, q_images, question, answer, cat) VALUES (?, ?, ?, ?, ?)";
 
-            if ($conn->query($sql) === TRUE) {
+            $stmt = $conn->prepare($sql);
+            $stmt->bind_param("sssss", $id, $q_images, $question, $answer, $cat);
+
+            if ($stmt->execute()) {
                 echo "<script>alert('Your product was uploaded successfully')</script>";
             } else {
-                echo "<script>alert('Error: " . $sql . "<br>" . $conn->error . "')</script>";
+                echo "<script>alert('Error: " . $stmt->error . "')</script>";
             }
+
+            $stmt->close();
         }
     }
 }
@@ -56,15 +61,22 @@ if (isset($_POST["submit"])) {
     <title>Insert Page</title>
     <link rel="stylesheet" href="product.css">
     <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f4f4f4;
+            margin: 0;
+            padding: 0;
+        }
+
         .page-header {
             background-color: coral;
             color: white;
             text-align: center;
             padding: 20px;
+            margin-bottom: 20px;
         }
 
         .container {
-            align-items: center;
             max-width: 600px;
             margin: 0 auto;
             padding: 20px;
@@ -73,18 +85,43 @@ if (isset($_POST["submit"])) {
             text-align: center;
         }
 
+        #upload_container form {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        #upload_container form input,
         #upload_container form select {
+            margin: 10px 0;
             padding: 8px;
             outline: none;
             background: white;
             border: 1px solid hotpink;
-            margin-bottom: 20px;
+        }
+
+        #upload_container form button {
+            padding: 10px;
+            background-color: coral;
+            color: white;
+            border: none;
+            cursor: pointer;
+        }
+
+        #upload_container form button:hover {
+            background-color: #ff6347;
         }
 
         .messages {
             text-align: center;
             font-size: 15px;
             margin-top: 10px;
+        }
+
+        .back-link {
+            display: block;
+            margin-top: 20px;
+            text-align: center;
         }
     </style>
 </head>
@@ -100,7 +137,7 @@ if (isset($_POST["submit"])) {
             <form action="upload.php" method="POST" enctype="multipart/form-data">
                 <input type="text" name="questionid" id="questionid" placeholder="Question ID" required>
                 <input type="text" name="question" id="question" placeholder="Question" required>
-                <input type="number" name="answerid" id="answerid" placeholder="Answer" required>
+                <input type="text" name="answer" id="answer" placeholder="Answer" required>
                 <select name="category" id="category" required>
                     <option value="easy">Easy</option>
                     <option value="medium">Medium</option>
@@ -112,14 +149,14 @@ if (isset($_POST["submit"])) {
                 <input type="submit" value="Upload" name="submit">
             </form>
             <div class="messages">
-                <p><a href="homePage.php">Back to Main Menu</a></p>
+                <p class="back-link"><a href="homePage.php">Back to Main Menu</a></p>
             </div>
         </section>
 
         <script>
             var questionid = document.getElementById("questionid");
             var question = document.getElementById("question");
-            var answerid = document.getElementById("answerid");
+            var answer = document.getElementById("answer");
             var choose = document.getElementById("choose");
             var uploadImage = document.getElementById("imageUpload");
 
